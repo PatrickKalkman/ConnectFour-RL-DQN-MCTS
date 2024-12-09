@@ -1,0 +1,43 @@
+[project]
+name = "connectfour"
+version = "0.1.0"
+description = "This repository implements a reinforcement learning solution for the Connect Four game, demonstrating the transition from simple to complex game AI."
+authors = [ { name = "Patrick Kalkman", email = "patrick@simpletechture.nl" }]
+dependencies = [
+    "pettingzoo==1.24.3",
+    "pygame==2.6.1",
+    "numpy==2.1.3",
+    "torch==2.5.1",
+    "matplotlib>=3.9.2",
+    "seaborn>=0.13.2",
+]
+requires-python = ">=3.10"
+license = { text = "MIT" }
+readme = "README.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-cov>=4.1.0",
+    "black>=23.11.0",
+    "isort>=5.12.0",
+    "mypy>=1.7.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v"
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
