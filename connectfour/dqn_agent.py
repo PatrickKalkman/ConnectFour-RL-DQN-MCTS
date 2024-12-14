@@ -31,6 +31,7 @@ class DQNAgent:
         self.tau = tau
         self.temperature = temperature
 
+        self.epsilon_start = epsilon_start
         self.epsilon = epsilon_start
         self.epsilon_end = epsilon_end
         self.epsilon_decay = epsilon_decay
@@ -45,6 +46,7 @@ class DQNAgent:
         self.memory = ReplayMemory(memory_capacity, device)
         self.loss_window = []
         self.loss_window_size = 100
+        self.training_steps = 0
 
     def select_action(self, state, valid_moves, deterministic=False):
         if deterministic:
@@ -121,9 +123,15 @@ class DQNAgent:
         if self.training_steps % 100 == 0:
             self.soft_update_target_network()
 
-        self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
+        self.epsilon = self.get_epsilon(self.training_steps)
 
         return loss_value
+
+    def get_epsilon(self, episode):
+        # Reset epsilon every 50k episodes
+        cycle_episode = episode % 50000
+        base_epsilon = max(self.epsilon_end, self.epsilon_start * (self.epsilon_decay ** cycle_episode))
+        return base_epsilon
 
     def soft_update_target_network(self):
         for target_param, policy_param in zip(

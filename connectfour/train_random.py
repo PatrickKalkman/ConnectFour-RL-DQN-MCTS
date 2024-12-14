@@ -22,11 +22,11 @@ class TrainingConfig:
     # DQN specific parameters
     batch_size: int = 512
     memory_capacity: int = 1_00_000
-    learning_rate: float = 1e-4
+    learning_rate: float = 1e-5
     gamma: float = 0.99
     epsilon_start: float = 1.0
-    epsilon_end: float = 0.1
-    epsilon_decay: float = 0.999995
+    epsilon_end: float = 0.2
+    epsilon_decay: float = 0.999997
 
 
 class DQNTrainer:
