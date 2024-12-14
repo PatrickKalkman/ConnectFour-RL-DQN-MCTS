@@ -4,7 +4,8 @@ import time
 import torch
 from pettingzoo.classic import connect_four_v3
 
-from connectfour.deep_q_network.dqn_agent import DQNAgent
+from connectfour.dqn_agent import DQNAgent
+from connectfour.mcts import MCTS  # Import the MCTS class we created earlier
 
 
 class GameState:
@@ -16,7 +17,7 @@ class GameState:
 
 def play_against_agent(model_path: str = None):
     if model_path is None:
-        potential_paths = ["./models/dqn_agent_random_first_player_dualing.pth"]
+        potential_paths = ["./models/dqn_agent_self_play.pth"]
         model_path = next(
             (path for path in potential_paths if os.path.exists(path)), None
         )
@@ -44,6 +45,16 @@ def play_against_agent(model_path: str = None):
     except Exception as e:
         print(f"Error loading model: {str(e)}")
         return
+
+    # Initialize MCTS
+    mcts_args = {
+        "num_simulations": 2800,  # More simulations for stronger play
+        "c1": 1.8,
+        "c2": 19652,
+        "temperature": 0.3,  # Lower temperature for more focused play
+    }
+    env = connect_four_v3.env(render_mode="human")
+    mcts = MCTS(env, agent.policy_net, mcts_args)
 
     game_state = GameState()
     valid_moves_tensor = torch.zeros((6, 7), device=device)
@@ -73,14 +84,36 @@ def play_against_agent(model_path: str = None):
             env.step(move)
         return True
 
+    def analyze_position(observation, valid_actions):
+        """Analyze position using both MCTS and DQN"""
+        state = preprocess_observation(observation)
+        print("\nPosition Analysis:")
+
+        # DQN Analysis
+        with torch.no_grad():
+            q_values = agent.policy_net(state.unsqueeze(0))[0]
+            print("\nDQN Values:")
+            for action in valid_actions:
+                print(f"Column {action}: {q_values[action].item():.3f}")
+
+        # MCTS Analysis
+        if game_state.show_analysis:
+            print("\nRunning MCTS analysis...")
+            action = mcts.run(observation, valid_actions, "player_0")
+            visits = [
+                (action, child.visit_count)
+                for action, child in mcts.root.children.items()
+            ]
+            visits.sort(key=lambda x: x[1], reverse=True)
+
+            print("\nMCTS Visit Counts:")
+            for action, visits in visits:
+                if action in valid_actions:
+                    print(f"Column {action}: {visits} visits")
+
     def handle_human_turn(observation, valid_actions):
         if game_state.show_analysis:
-            print("\nAgent's move analysis:")
-            state = preprocess_observation(observation)
-            with torch.no_grad():
-                q_values = agent.policy_net(state.unsqueeze(0))[0]
-                for action in valid_actions:
-                    print(f"Column {action}: {q_values[action].item():.3f}")
+            analyze_position(observation, valid_actions)
 
         while True:
             print(f"\nValid moves: {valid_actions}")
@@ -102,7 +135,6 @@ def play_against_agent(model_path: str = None):
             except ValueError:
                 print("Enter a number between 0-6")
 
-    env = connect_four_v3.env(render_mode="human")
     env.reset()
 
     for agent_name in env.agent_iter():
@@ -110,7 +142,7 @@ def play_against_agent(model_path: str = None):
 
         if termination or truncation:
             if reward != 0:
-                winner = "Agent" if agent_name == "player_0" else "Human"
+                winner = "Human" if agent_name == "player_0" else "Agent"
                 print(f"\n{winner} wins!")
             else:
                 print("\nDraw!")
@@ -125,15 +157,29 @@ def play_against_agent(model_path: str = None):
         else:  # Agent
             print("\nAgent thinking...")
             time.sleep(0.5)
-            state = preprocess_observation(observation)
-            action = agent.select_action(state, valid_moves, deterministic=True)
+
+            action = mcts.run(observation, valid_moves, agent_name)
 
             if game_state.show_analysis:
+                state = preprocess_observation(observation)
                 with torch.no_grad():
                     q_values = agent.policy_net(state.unsqueeze(0))[0]
-                    print(
-                        f"Agent chose {action} (value: {q_values[action].item():.3f})"
-                    )
+                    print(f"\nAgent chose column {action}")
+                    print(f"DQN value: {q_values[action].item():.3f}")
+
+                    # Get MCTS statistics
+                    policy = mcts.get_policy()
+                    if policy:
+                        print("\nMCTS Analysis:")
+                        for move, prob in sorted(
+                            policy.items(), key=lambda x: x[1], reverse=True
+                        ):
+                            if move in valid_moves:
+                                visits = mcts.root.children[move].visit_count
+                                value = mcts.root.children[move].value()
+                                print(
+                                    f"Column {move}: {prob:.3f} ({visits} visits, value: {value:.3f})"
+                                )
 
         game_state.move_history.append(action)
         game_state.state_history.append(observation)
@@ -147,4 +193,6 @@ def play_against_agent(model_path: str = None):
 
 if __name__ == "__main__":
     print("Connect Four - You are yellow (player 2)")
+    print("The agent will use both DQN and MCTS for move selection")
+    print("Analysis will show both DQN values and MCTS visit counts")
     play_against_agent()

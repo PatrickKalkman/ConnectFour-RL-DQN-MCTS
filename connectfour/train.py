@@ -10,7 +10,7 @@ from connectfour.train_base import DQNTrainer
 
 @dataclass
 class MCTSConfig:
-    num_simulations: int = 40 
+    num_simulations: int = 40
     c1: float = 1.5
     c2: float = 19652
     temperature: float = 1.0

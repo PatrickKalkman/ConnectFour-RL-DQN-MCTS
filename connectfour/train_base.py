@@ -3,8 +3,8 @@ import os
 import time
 from collections import deque
 from dataclasses import dataclass
-import numpy as np
 
+import numpy as np
 import torch
 from pettingzoo.classic import connect_four_v3
 from torch.optim.lr_scheduler import CyclicLR
@@ -312,25 +312,35 @@ class DQNTrainer:
         recent_losses = recent_results_list.count("L")
         recent_draws = recent_results_list.count("D")
         recent_total = len(recent_results_list)
-        recent_percentage = (recent_wins / recent_total * 100) if recent_total > 0 else 0
+        recent_percentage = (
+            (recent_wins / recent_total * 100) if recent_total > 0 else 0
+        )
         draws_ratio = (self.draws / total_games * 100) if total_games > 0 else 0
 
-        avg_moves = sum(self.moves_history[-1000:]) / len(self.moves_history[-1000:]) if self.moves_history else 0
-        
+        avg_moves = (
+            sum(self.moves_history[-1000:]) / len(self.moves_history[-1000:])
+            if self.moves_history
+            else 0
+        )
+
         # Calculate average Q-value from policy net's predictions
         avg_q_value = 0
         try:
-            if (hasattr(self, 'agent') and hasattr(self.agent, 'policy_net') and 
-                hasattr(self, 'env') and self.env is not None):
-                
+            if (
+                hasattr(self, "agent")
+                and hasattr(self.agent, "policy_net")
+                and hasattr(self, "env")
+                and self.env is not None
+            ):
+
                 # Create a dummy state for Q-value calculation
                 dummy_board = np.zeros((6, 7, 1), dtype=np.float32)
                 dummy_observation = {
                     "observation": dummy_board,
-                    "action_mask": [1] * 7  # All moves valid for dummy state
+                    "action_mask": [1] * 7,  # All moves valid for dummy state
                 }
                 current_state = self._preprocess_observation(dummy_observation)
-                
+
                 if current_state is not None:
                     with torch.no_grad():
                         q_values = self.agent.policy_net(current_state.unsqueeze(0))
@@ -341,13 +351,17 @@ class DQNTrainer:
         # Calculate MCTS statistics
         mcts_visit_diversity = 0
         visit_entropy = 0
-        if hasattr(self, 'mcts') and hasattr(self.mcts, 'root') and self.mcts.root is not None:
+        if (
+            hasattr(self, "mcts")
+            and hasattr(self.mcts, "root")
+            and self.mcts.root is not None
+        ):
             visits = [child.visit_count for child in self.mcts.root.children.values()]
             if visits:
                 # Calculate visit diversity as normalized entropy
                 total_visits = sum(visits)
                 if total_visits > 0:
-                    probs = [v/total_visits for v in visits]
+                    probs = [v / total_visits for v in visits]
                     # Calculate entropy
                     entropy = -sum(p * np.log(p) if p > 0 else 0 for p in probs)
                     # Normalize by log(n) where n is number of moves
@@ -356,10 +370,13 @@ class DQNTrainer:
                     mcts_visit_diversity = len(set(visits))
 
         # Calculate exploration ratio (based on epsilon value instead of move history)
-        exploration_ratio = self.agent.epsilon if hasattr(self, 'agent') else 0
+        exploration_ratio = self.agent.epsilon if hasattr(self, "agent") else 0
 
-        memory_usage = (len(self.agent.memory) / self.config.memory_capacity * 100 
-                    if hasattr(self, 'agent') else 0)
+        memory_usage = (
+            len(self.agent.memory) / self.config.memory_capacity * 100
+            if hasattr(self, "agent")
+            else 0
+        )
 
         current_streak = 0
         max_streak = 0
@@ -370,7 +387,9 @@ class DQNTrainer:
             else:
                 break
 
-        win_rate_improvement = recent_percentage - getattr(self, "previous_win_rate", recent_percentage)
+        win_rate_improvement = recent_percentage - getattr(
+            self, "previous_win_rate", recent_percentage
+        )
         self.previous_win_rate = recent_percentage
 
         current_lr = self.scheduler.get_last_lr()[0]
@@ -392,20 +411,36 @@ class DQNTrainer:
         self.metrics_history["mcts_visit_diversity"].append(mcts_visit_diversity)
         self.metrics_history["visit_entropy"].append(visit_entropy)
         self.metrics_history["memory_usage"].append(memory_usage)
-        self.metrics_history["recent_draws"].append(recent_draws / recent_total * 100 if recent_total > 0 else 0)
-        self.metrics_history["recent_losses"].append(recent_losses / recent_total * 100 if recent_total > 0 else 0)
+        self.metrics_history["recent_draws"].append(
+            recent_draws / recent_total * 100 if recent_total > 0 else 0
+        )
+        self.metrics_history["recent_losses"].append(
+            recent_losses / recent_total * 100 if recent_total > 0 else 0
+        )
 
         # Print enhanced progress
         print(f"\nEpisode: {episode} | FPS: {fps:.2f}")
         print(f"Learning Rate: {current_lr:.6f}")
-        print(f"Overall Win Rate: {win_percentage:.1f}% | Recent: {recent_percentage:.1f}%")
-        print(f"Recent W/D/L: {recent_wins/recent_total*100:.1f}%/{recent_draws/recent_total*100:.1f}%/{recent_losses/recent_total*100:.1f}%")
-        print(f"Win Rate Change: {win_rate_improvement:+.1f}% | Current Streak: {current_streak}")
+        print(
+            f"Overall Win Rate: {win_percentage:.1f}% | Recent: {recent_percentage:.1f}%"
+        )
+        print(
+            f"Recent W/D/L: {recent_wins/recent_total*100:.1f}%/{recent_draws/recent_total*100:.1f}%/{recent_losses / recent_total*100:.1f}%"
+        )
+        print(
+            f"Win Rate Change: {win_rate_improvement:+.1f}% | Current Streak: {current_streak}"
+        )
         print(f"Avg Moves: {avg_moves:.1f} | Loss: {loss:.6f}")
         print(f"Avg Q-Value: {avg_q_value:.3f} | Visit Entropy: {visit_entropy:.3f}")
-        print(f"MCTS Diversity: {mcts_visit_diversity} | Memory Usage: {memory_usage:.1f}%")
-        print(f"Main ε: {self.agent.epsilon:.3f} | Opp ε: {self.opponent_agent.epsilon:.3f}")
-        print(f"Temp: {self.config.temperature:.2f} | Opp Temp: {self.config.temperature * 1.5:.2f}")
+        print(
+            f"MCTS Diversity: {mcts_visit_diversity} | Memory Usage: {memory_usage:.1f}%"
+        )
+        print(
+            f"Main ε: {self.agent.epsilon:.3f} | Opp ε: {self.opponent_agent.epsilon:.3f}"
+        )
+        print(
+            f"Temp: {self.config.temperature:.2f} | Opp Temp: {self.config.temperature * 1.5:.2f}"
+        )
         print("-" * 70)
 
     def save_metrics(self, episode):
