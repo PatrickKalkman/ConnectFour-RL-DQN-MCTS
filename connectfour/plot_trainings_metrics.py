@@ -123,7 +123,7 @@ class MetricsVisualizer:
 
 
 def main():
-    metrics_path = "./metrics/dqn_training_metrics_random_first_player_90000.json"
+    metrics_path = "./metrics/dqn_training_metrics_random_first_player_140000.json"
     visualizer = MetricsVisualizer(metrics_path)
 
     # Print detailed debug information
